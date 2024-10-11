@@ -1,5 +1,15 @@
 import { ChatFireworks } from "@langchain/community/chat_models/fireworks";
 import dotenv from "dotenv";
+import {
+  START,
+  END,
+  MessagesAnnotation,
+  StateGraph,
+  MemorySaver,
+} from "@langchain/langgraph";
+import { v4 as uuidv4 } from "uuid";
+
+const config = { configurable: { thread_id: uuidv4() } };
 
 dotenv.config();
 
@@ -9,27 +19,68 @@ dotenv.config();
     temperature: 0,
   });
 
-  const result = await llm.invoke([
-    { role: "user", content: "Hi! I'm Bob" },
-    { role: "assistant", content: "Hello Bob! How can I assist you today?" },
-    { role: "user", content: "What's my name?" },
-  ]);
+  // Define the function that calls the model
+  const callModel = async (state: typeof MessagesAnnotation.State) => {
+    const response = await llm.invoke(state.messages);
+    return { messages: response };
+  };
 
-  console.log(result);
+  // Define a new graph
+  const workflow = new StateGraph(MessagesAnnotation)
+    // Define the node and edge
+    .addNode("model", callModel)
+    .addEdge(START, "model")
+    .addEdge("model", END);
+
+  // Add memory
+  const memory = new MemorySaver();
+  const app = workflow.compile({ checkpointer: memory });
+
+  const input = [{ role: "user", content: "Hi! I'm Bob." }];
+  const output = await app.invoke({ messages: input }, config);
+  // The output contains all messages in the state.
+  // This will long the last message in the conversation.
+  console.log(output.messages[output.messages.length - 1]);
+
+  const input2 = [{ role: "user", content: "What's my name?" }];
+  const output2 = await app.invoke({ messages: input2 }, config);
+  console.log(output2.messages[output2.messages.length - 1]);
 })();
 
 /* 
 Console output:
 
 AIMessage {
-  "id": "324a54f6-d8cd-4fba-b905-69c20b416d14",
+  "id": "13a18863-932f-4535-a25e-e25ac338ec31",
+  "content": "Hi Bob! It's nice to meet you! Is there something I can help you with or would you like to chat?",
+  "additional_kwargs": {},
+  "response_metadata": {
+    "tokenUsage": {
+      "promptTokens": 21,
+      "completionTokens": 26,
+      "totalTokens": 47
+    },
+    "finish_reason": "stop"
+  },
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "output_tokens": 26,
+    "input_tokens": 21,
+    "total_tokens": 47,
+    "input_token_details": {},
+    "output_token_details": {}
+  }
+}
+AIMessage {
+  "id": "a1c9792e-b3ca-4648-a17b-83d937a69ce3",
   "content": "Your name is Bob!",
   "additional_kwargs": {},
   "response_metadata": {
     "tokenUsage": {
-      "promptTokens": 45,
+      "promptTokens": 61,
       "completionTokens": 6,
-      "totalTokens": 51
+      "totalTokens": 67
     },
     "finish_reason": "stop"
   },
@@ -37,8 +88,8 @@ AIMessage {
   "invalid_tool_calls": [],
   "usage_metadata": {
     "output_tokens": 6,
-    "input_tokens": 45,
-    "total_tokens": 51,
+    "input_tokens": 61,
+    "total_tokens": 67,
     "input_token_details": {},
     "output_token_details": {}
   }
