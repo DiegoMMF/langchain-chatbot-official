@@ -45,6 +45,13 @@ dotenv.config();
   const input2 = [{ role: "user", content: "What's my name?" }];
   const output2 = await app.invoke({ messages: input2 }, config);
   console.log(output2.messages[output2.messages.length - 1]);
+
+  // Create a new thread: note that the thread_id is different so
+  // the model will not remember the previous conversation
+  const config2 = { configurable: { thread_id: uuidv4() } };
+  const input3 = [{ role: "user", content: "What's my name?" }];
+  const output3 = await app.invoke({ messages: input3 }, config2);
+  console.log(output3.messages[output3.messages.length - 1]);
 })();
 
 /* 
